@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>For Cait</title>
+<meta name="description" content="An invitation." />
+<meta name="theme-color" content="#16110d" />
+
+<!-- Open Graph: a soft preview if the link is shared -->
+<meta property="og:title" content="For Cait" />
+<meta property="og:description" content="An invitation. Tap to open the seal." />
+<meta property="og:type" content="website" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Pinyon+Script&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    /* House of Hud DNA */
+    --paper:#fbf8f1;
+    --paper-edge:#f3ede1;
+    --ink:#1f1a16;
+    --muted:#6f6a64;
+    --gold:#c8a87e;
+    --gold-deep:#9a7838;   /* darkened for AA text contrast on cream */
+    --gold-label:#85692f;  /* small-caps labels need to clear 4.5:1 */
+    --hair:#e8e1d6;
+    --wax:#7a2e36;
+    --wax-hi:#9a4049;
+    --scene:#16110d;
+    --serif:"Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --body:Georgia, "Times New Roman", serif;
+    --script:"Pinyon Script", "Cormorant Garamond", cursive;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{ height:100%; }
+
+  body{
+    font-family:var(--body);
+    color:var(--ink);
+    background:
+      radial-gradient(120% 90% at 50% 28%, #2a1f15 0%, #1c1510 38%, var(--scene) 78%);
+    min-height:100dvh;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* faint topographic / route lines in the scene: a quiet climbing nod */
+  .scene-lines{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    opacity:.06;
+  }
+
+  /* drifting gold dust */
+  .dust{ position:fixed; inset:0; z-index:1; pointer-events:none; overflow:hidden; }
+  .mote{
+    position:absolute; bottom:-12px;
+    width:3px; height:3px; border-radius:50%;
+    background:radial-gradient(circle, var(--gold) 0%, rgba(200,168,126,0) 70%);
+    animation:rise linear infinite;
+    will-change:transform, opacity;
+  }
+  @keyframes rise{
+    0%{ transform:translate3d(0,0,0) scale(.6); opacity:0; }
+    12%{ opacity:.9; }
+    88%{ opacity:.7; }
+    100%{ transform:translate3d(var(--dx,0), -106dvh, 0) scale(1.1); opacity:0; }
+  }
+
+  .stage{
+    position:relative; z-index:2;
+    min-height:100dvh;
+    display:flex; align-items:center; justify-content:center;
+    padding:max(28px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom));
+  }
+
+  /* ============ ENVELOPE ============ */
+  .envelope-wrap{
+    width:100%; max-width:380px;
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center;
+    animation:floaty 6s ease-in-out infinite;
+    will-change:transform;
+  }
+  @keyframes floaty{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(-10px); }
+  }
+
+  .eyebrow{
+    font-family:var(--serif);
+    font-size:13px; letter-spacing:.34em; text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:26px;
+    opacity:.92;
+  }
+
+  .envelope{
+    position:relative;
+    width:min(78vw, 320px);
+    aspect-ratio:7 / 5;
+    background:linear-gradient(180deg, var(--paper) 0%, var(--paper-edge) 100%);
+    border-radius:8px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.6) inset,
+      0 30px 70px -30px rgba(0,0,0,.75),
+      0 8px 26px -12px rgba(0,0,0,.55);
+    cursor:pointer;
+    border:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  /* body crease lines of the envelope */
+  .envelope::before{
+    content:""; position:absolute; inset:0; border-radius:8px;
+    background:
+      linear-gradient(135deg, transparent 49.6%, rgba(0,0,0,.05) 50%, transparent 50.4%),
+      linear-gradient(225deg, transparent 49.6%, rgba(0,0,0,.05) 50%, transparent 50.4%);
+    z-index:1;
+  }
+  /* the closing flap (triangle), hinged at the top */
+  .flap{
+    position:absolute; top:0; left:0; right:0;
+    height:64%;
+    background:linear-gradient(180deg, #fdfbf5 0%, #f1ebde 100%);
+    clip-path:polygon(0 0, 100% 0, 50% 100%);
+    transform-origin:top center;
+    transition:transform .9s cubic-bezier(.7,0,.3,1);
+    z-index:4;
+    box-shadow:0 2px 6px -2px rgba(0,0,0,.18);
+  }
+  .flap::after{ /* subtle gold edge on the flap fold */
+    content:""; position:absolute; inset:0;
+    clip-path:polygon(0 0, 100% 0, 50% 100%);
+    border-top:1px solid rgba(200,168,126,.35);
+  }
+
+  /* wax seal */
+  .seal{
+    position:absolute; left:50%; top:54%;
+    width:78px; height:78px; transform:translate(-50%,-50%);
+    z-index:6;
+    transition:transform .5s ease, opacity .5s ease;
+  }
+  .seal-half{
+    position:absolute; inset:0; border-radius:50%;
+    background:
+      radial-gradient(circle at 38% 32%, var(--wax-hi) 0%, var(--wax) 46%, #5e222a 100%);
+    box-shadow:0 4px 10px -3px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.18) inset;
+    clip-path:inset(0 0 0 0);
+    transition:transform .8s cubic-bezier(.6,0,.2,1), opacity .8s ease;
+  }
+  .seal-half.left{ clip-path:polygon(0 0, 50% 0, 50% 100%, 0 100%); }
+  .seal-half.right{ clip-path:polygon(50% 0, 100% 0, 100% 100%, 50% 100%); }
+  .seal-mark{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    z-index:2; transition:opacity .35s ease;
+  }
+  .seal-mark svg{ width:38px; height:38px; }
+
+  .hint{
+    margin-top:30px;
+    font-family:var(--serif);
+    font-size:15px; letter-spacing:.06em;
+    color:rgba(251,248,241,.62);
+    animation:pulse 2.6s ease-in-out infinite;
+  }
+  .hint .for{
+    display:block;
+    font-family:var(--script);
+    font-size:38px; line-height:1;
+    color:var(--paper);
+    letter-spacing:0;
+    margin-bottom:14px;
+    text-shadow:0 1px 16px rgba(200,168,126,.35);
+  }
+  @keyframes pulse{ 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
+
+  /* ============ OPENING STATE ============ */
+  .opening .envelope-wrap{ animation:none; }
+  .opening .flap{ transform:rotateX(-180deg); }
+  .opening .seal{ transform:translate(-50%,-50%) scale(1.18); opacity:0; }
+  .opening .seal-half.left{ transform:translate(-26px,-10px) rotate(-32deg); opacity:0; }
+  .opening .seal-half.right{ transform:translate(26px,-10px) rotate(32deg); opacity:0; }
+  .opening .seal-mark{ opacity:0; }
+  .opening .hint{ opacity:0; transition:opacity .3s ease; }
+
+  /* ============ THE LETTER ============ */
+  .letter{
+    position:relative; z-index:3;
+    width:100%; max-width:600px; margin:0 auto;
+    background:linear-gradient(180deg, var(--paper) 0%, #f7f1e6 100%);
+    border-radius:14px;
+    padding:48px 30px 40px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.7) inset,
+      0 40px 90px -40px rgba(0,0,0,.8),
+      0 12px 40px -18px rgba(0,0,0,.6);
+    opacity:0;
+    transform:translateY(40px) scale(.97);
+    pointer-events:none;
+  }
+  .letter.show{
+    opacity:1; transform:none; pointer-events:auto;
+    transition:opacity .8s ease .15s, transform .9s cubic-bezier(.16,1,.3,1) .15s;
+  }
+  /* paper grain */
+  .letter::before{
+    content:""; position:absolute; inset:0; border-radius:14px; pointer-events:none;
+    background-image:radial-gradient(rgba(120,90,50,.05) 1px, transparent 1px);
+    background-size:4px 4px; opacity:.5;
+  }
+
+  .reveal{ opacity:0; transform:translateY(16px); }
+  .letter.show .reveal{
+    animation:revealUp .7s cubic-bezier(.16,1,.3,1) forwards;
+    animation-delay:var(--d, .3s);
+  }
+  @keyframes revealUp{ to{ opacity:1; transform:none; } }
+
+  .l-eyebrow{
+    text-align:center;
+    font-family:var(--serif);
+    font-size:12px; letter-spacing:.32em; text-transform:uppercase;
+    color:var(--gold-label);
+    margin-bottom:14px;
+  }
+  .l-title{
+    text-align:center;
+    font-family:var(--serif);
+    font-weight:500;
+    font-size:clamp(33px, 9vw, 52px);
+    line-height:1.04;
+    letter-spacing:.005em;
+    color:var(--ink);
+    margin-bottom:22px;
+  }
+  .l-title em{ font-style:italic; color:var(--gold-deep); }
+
+  .flourish{ display:block; margin:0 auto 26px; width:170px; height:auto; color:var(--gold); }
+
+  .note{
+    font-family:var(--serif);
+    font-size:clamp(18px, 5vw, 21px);
+    line-height:1.62;
+    color:#3a342d;
+    text-align:center;
+    max-width:46ch; margin:0 auto 34px;
+  }
+
+  .details{
+    border-top:1px solid var(--hair);
+    margin-bottom:30px;
+  }
+  .row{
+    display:grid;
+    grid-template-columns:96px 1fr;
+    gap:16px;
+    padding:16px 2px;
+    border-bottom:1px solid var(--hair);
+    align-items:start;
+  }
+  .row .k{
+    font-family:var(--serif);
+    font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--gold-label);
+    padding-top:4px;
+  }
+  .row .v{
+    font-family:var(--serif);
+    font-size:18px; line-height:1.45; color:var(--ink);
+  }
+  .row .v small{ display:block; font-size:14px; color:var(--muted); margin-top:3px; letter-spacing:.01em; }
+  .row .v .sharp{ color:var(--gold-deep); font-style:italic; }
+
+  .actions{
+    display:flex; flex-direction:column; gap:12px;
+    margin-top:6px;
+  }
+  @media(min-width:460px){ .actions{ flex-direction:row; justify-content:center; } }
+
+  .btn{
+    appearance:none; border:none; cursor:pointer;
+    font-family:var(--serif); font-size:17px; letter-spacing:.04em;
+    padding:15px 26px; border-radius:999px;
+    min-height:50px;
+    transition:transform .18s ease, box-shadow .25s ease, background .25s ease, color .25s ease;
+    -webkit-tap-highlight-color:transparent;
+    text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  }
+  .btn:active{ transform:translateY(1px) scale(.985); }
+  .btn-primary{
+    background:linear-gradient(180deg, #b18f55 0%, #8a6c33 100%); /* deepened so white text clears AA */
+    color:#fff;
+    box-shadow:0 10px 24px -10px rgba(138,108,51,.85), 0 1px 0 rgba(255,255,255,.35) inset;
+  }
+  .btn-primary:hover{ box-shadow:0 14px 30px -10px rgba(138,108,51,1), 0 1px 0 rgba(255,255,255,.35) inset; }
+  .btn-ghost{
+    background:transparent; color:var(--gold-deep);
+    border:1px solid var(--gold);
+  }
+  .btn-ghost:hover{ background:rgba(200,168,126,.1); }
+
+  .signed{
+    text-align:center; margin-top:32px;
+  }
+  .signed .sig{
+    font-family:var(--script); font-size:46px; line-height:.9; color:var(--ink);
+  }
+  .signed .ps{
+    font-family:var(--serif); font-style:italic; font-size:15px; color:var(--muted); margin-top:8px;
+  }
+
+  /* confirmation swap */
+  .confirm{ display:none; text-align:center; }
+  .confirm.show{ display:block; animation:revealUp .6s ease forwards; }
+  .confirm .big{
+    font-family:var(--serif); font-style:italic; font-size:clamp(24px,7vw,32px);
+    color:var(--gold-deep); line-height:1.2; margin-bottom:6px;
+  }
+  .confirm .small{ font-family:var(--serif); font-size:18px; color:#3a342d; }
+
+  /* floating hearts on yes */
+  .heart{
+    position:fixed; z-index:40; pointer-events:none;
+    font-size:20px; color:var(--wax);
+    animation:floatHeart 2.4s ease-out forwards;
+    will-change:transform, opacity;
+  }
+  @keyframes floatHeart{
+    0%{ transform:translateY(0) scale(.6) rotate(0); opacity:0; }
+    14%{ opacity:1; }
+    100%{ transform:translateY(-46dvh) scale(1.15) rotate(var(--r,12deg)); opacity:0; }
+  }
+
+  .footer-note{
+    text-align:center; margin-top:30px; padding-top:18px;
+    border-top:1px solid var(--hair);
+    font-family:var(--serif); font-size:13px; color:#9a9087; letter-spacing:.03em;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .envelope-wrap{ animation:none; }
+    .hint{ animation:none; opacity:.85; }
+    .mote{ display:none; }
+    .letter, .reveal{ transition:none; animation:none; opacity:1; transform:none; }
+    .flap{ transition:transform .01s; }
+    .heart{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- quiet topographic / route-line backdrop (climbing nod) -->
+<svg class="scene-lines" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <g fill="none" stroke="#c8a87e" stroke-width="1">
+    <path d="M-20 120 C 80 90, 140 170, 220 140 S 380 110, 440 150" />
+    <path d="M-20 220 C 90 190, 150 270, 240 240 S 380 210, 440 250" />
+    <path d="M-20 330 C 70 300, 160 380, 250 350 S 380 320, 440 360" />
+    <path d="M-20 460 C 100 430, 150 510, 240 480 S 380 450, 440 490" />
+    <path d="M-20 590 C 80 560, 160 640, 250 610 S 380 580, 440 620" />
+    <path d="M-20 700 C 90 670, 150 750, 240 720 S 380 690, 440 730" />
+  </g>
+</svg>
+
+<div class="dust" id="dust" aria-hidden="true"></div>
+
+<main class="stage" id="stage">
+
+  <!-- ENVELOPE -->
+  <button class="envelope-wrap" id="opener" aria-label="Open the letter for Cait">
+    <span class="eyebrow">An Invitation</span>
+    <span class="envelope" aria-hidden="true">
+      <span class="flap"></span>
+      <span class="seal">
+        <span class="seal-half left"></span>
+        <span class="seal-half right"></span>
+        <span class="seal-mark">
+          <!-- mountain peak = a quiet nod to "ascend" -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="#f3dcb8" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M3 19 L9.5 7 L13 13 L16 8.5 L21 19 Z" />
+            <path d="M9.5 7 L11 9.6" opacity=".7"/>
+          </svg>
+        </span>
+      </span>
+    </span>
+    <span class="hint">
+      <span class="for">for Cait</span>
+      tap to break the seal
+    </span>
+  </button>
+
+  <!-- LETTER -->
+  <article class="letter" id="letter" aria-hidden="true">
+    <p class="l-eyebrow reveal" style="--d:.30s">You're Invited</p>
+    <h1 class="l-title reveal" style="--d:.40s">Will you <em>climb</em><br>with me?</h1>
+
+    <svg class="flourish reveal" style="--d:.52s" viewBox="0 0 200 26" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" aria-hidden="true">
+      <line x1="2" y1="20" x2="64" y2="20" />
+      <circle cx="72" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+      <path d="M82 20 L94 9 L101 15 L108 6 L118 20 Z" />
+      <circle cx="128" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+      <line x1="136" y1="20" x2="198" y2="20" />
+    </svg>
+
+    <p class="note reveal" style="--d:.62s">
+      There's a wall in the South Side with your name somewhere near the top of it.
+      Come find out how high we get. No experience needed. Just you.
+    </p>
+
+    <div class="details">
+      <div class="row reveal" style="--d:.72s">
+        <div class="k">When</div>
+        <div class="v">Saturday, June 27th<small><span class="sharp">4:00 in the afternoon, sharp.</span> I'll pick you up.</small></div>
+      </div>
+      <div class="row reveal" style="--d:.80s">
+        <div class="k">Where</div>
+        <div class="v">Ascend Climbing &middot; South Side<small>2141 Mary St, Pittsburgh, PA</small></div>
+      </div>
+      <div class="row reveal" style="--d:.88s">
+        <div class="k">The Plan</div>
+        <div class="v">We climb. We laugh at how I climb.<small>Dinner after, if you're up for it.</small></div>
+      </div>
+      <div class="row reveal" style="--d:.96s">
+        <div class="k">Wear</div>
+        <div class="v">Anything you can move in.<small>They handle the shoes.</small></div>
+      </div>
+    </div>
+
+    <div id="invite-block">
+      <div class="actions reveal" style="--d:1.04s">
+        <a class="btn btn-ghost" href="https://maps.google.com/?q=Ascend+Climbing+2141+Mary+St+Pittsburgh+PA+15203" target="_blank" rel="noopener">
+          Get directions
+        </a>
+        <button class="btn btn-primary" id="yes">Yes, I'll be ready</button>
+      </div>
+
+      <div class="signed reveal" style="--d:1.12s">
+        <div class="sig">Ben</div>
+        <div class="ps">p.s. the views from the top are supposed to be something.</div>
+      </div>
+    </div>
+
+    <div class="confirm" id="confirm">
+      <p class="big">It's a date.</p>
+      <p class="small">I'll see you Saturday at four. Wear the smile.</p>
+      <div class="signed" style="margin-top:22px">
+        <div class="sig">Ben</div>
+      </div>
+    </div>
+
+    <p class="footer-note reveal" style="--d:1.18s">South Side &middot; Pittsburgh &middot; June 2026</p>
+  </article>
+
+</main>
+
+<script>
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ----- gold dust ----- */
+  (function(){
+    if (reduce) return;
+    var host = document.getElementById('dust');
+    var N = window.innerWidth < 520 ? 22 : 36;
+    for (var i=0;i<N;i++){
+      var m = document.createElement('span');
+      m.className = 'mote';
+      var size = (Math.random()*3 + 2).toFixed(1);
+      m.style.left = (Math.random()*100) + 'vw';
+      m.style.width = size + 'px';
+      m.style.height = size + 'px';
+      m.style.setProperty('--dx', (Math.random()*60 - 30).toFixed(0) + 'px');
+      m.style.animationDuration = (Math.random()*10 + 11).toFixed(1) + 's';
+      m.style.animationDelay = (-Math.random()*16).toFixed(1) + 's';
+      m.style.opacity = (Math.random()*.5 + .3).toFixed(2);
+      host.appendChild(m);
+    }
+  })();
+
+  /* ----- open the letter ----- */
+  var stage = document.getElementById('stage');
+  var opener = document.getElementById('opener');
+  var letter = document.getElementById('letter');
+  var opened = false;
+
+  function open(){
+    if (opened) return; opened = true;
+    stage.classList.add('opening');
+    var wait = reduce ? 0 : 760;
+    setTimeout(function(){
+      opener.style.transition = 'opacity .5s ease, transform .6s ease';
+      opener.style.opacity = '0';
+      opener.style.transform = 'translateY(-18px) scale(.96)';
+      opener.style.pointerEvents = 'none';
+      setTimeout(function(){
+        opener.style.display = 'none';
+        stage.style.alignItems = 'flex-start';  /* tall letter must scroll from its top, not be center-clipped */
+        letter.setAttribute('aria-hidden','false');
+        letter.classList.add('show');
+        window.scrollTo({top:0, behavior: reduce ? 'auto':'smooth'});
+      }, reduce ? 0 : 420);
+    }, wait);
+  }
+  opener.addEventListener('click', open);
+
+  /* ----- yes -> hearts + confirmation ----- */
+  document.getElementById('yes').addEventListener('click', function(){
+    document.getElementById('invite-block').style.display = 'none';
+    document.getElementById('confirm').classList.add('show');
+    if (reduce) return;
+    var glyphs = ['♥','❤'];
+    for (var i=0;i<26;i++){
+      (function(i){
+        setTimeout(function(){
+          var h = document.createElement('span');
+          h.className = 'heart';
+          h.textContent = glyphs[i % glyphs.length];
+          h.style.left = (Math.random()*88 + 6) + 'vw';
+          h.style.bottom = (Math.random()*16 + 6) + 'dvh';
+          h.style.fontSize = (Math.random()*16 + 14).toFixed(0) + 'px';
+          h.style.color = i % 3 === 0 ? '#c8a87e' : '#7a2e36';
+          h.style.setProperty('--r', (Math.random()*40 - 20).toFixed(0) + 'deg');
+          h.style.animationDuration = (Math.random()*1.1 + 2).toFixed(1) + 's';
+          document.body.appendChild(h);
+          setTimeout(function(){ h.remove(); }, 2600);
+        }, i*55);
+      })(i);
+    }
+  });
+</script>
+</body>
+</html>
