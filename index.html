@@ -268,24 +268,26 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- 3D rose (WebGL) ---------- */
 const host = document.getElementById('rosehost');
-let renderer, scene, camera, rose, clock;
+let renderer, scene, camera, rose, tilt, clock;
 let petals = [], webglOK = false, falling = false, fallT = 0;
 
 function makePetalGeometry(){
-  const US=16, VS=12;
+  const US=20, VS=16;
   const pos=[], col=[], uv=[], idx=[];
   for (let i=0;i<=US;i++){
     const u=i/US;                                   // 0 base .. 1 tip
-    const halfW = 0.58 * Math.sin(Math.PI*Math.pow(u,0.82)); // narrow base+tip, wide middle
-    const curl = 0.5*u*u;                            // tip leans back (+z)
+    const wbase=Math.max(0, Math.sin(Math.PI*u));
+    const halfW = 0.62 * Math.pow(wbase, 0.5) * (0.5 + 0.5*u); // full, rounded, broad toward top
+    const curl = 0.62*u*u;                           // petal curves back along its length
     for (let j=0;j<=VS;j++){
       const t=(j/VS)*2-1;                            // -1..1 across width
       const x=t*halfW;
-      const y=u*1.05;
-      const cup = 0.34*t*t*Math.sin(Math.PI*u);      // edges curl up -> cupped petal
-      const z=curl+cup;
+      const y=u*1.08;
+      const cup = 0.46*t*t*Math.sin(Math.PI*u);      // deep cup across width
+      const edgeCurl = 0.12*Math.pow(Math.abs(t),3)*u; // edges curl back near the top
+      const z=curl+cup+edgeCurl;
       pos.push(x,y,z);
-      const shade=0.38+0.62*u;                        // base darker, tip brighter
+      const shade=0.42+0.58*u;                        // base darker, tip brighter
       col.push(shade, shade, shade);
       uv.push(j/VS, u);
     }
@@ -308,19 +310,23 @@ function makePetalGeometry(){
 function buildRose(){
   rose = new THREE.Group();
   const geo = makePetalGeometry();
-  const baseMat = new THREE.MeshStandardMaterial({
-    color:0xd01a2a, roughness:0.48, metalness:0.0,
+  const baseMat = new THREE.MeshPhysicalMaterial({
+    color:0xd1182a, roughness:0.55, metalness:0.0,
+    sheen:1.0, sheenColor:new THREE.Color(0xff97a4), sheenRoughness:0.55,
+    clearcoat:0.18, clearcoatRoughness:0.6,
     vertexColors:true, side:THREE.DoubleSide, transparent:true, opacity:1
   });
   // rings: count, scale, pitch(rad, outward tilt), baseY, out(radial), offset
   const rings = [
-    {n:9, sc:1.00, pitch:1.14, y:0.00, out:0.10, off:0.00},
-    {n:8, sc:0.86, pitch:0.96, y:0.04, out:0.085,off:0.42},
-    {n:7, sc:0.72, pitch:0.78, y:0.08, out:0.07, off:0.00},
-    {n:6, sc:0.58, pitch:0.58, y:0.12, out:0.055,off:0.55},
-    {n:5, sc:0.45, pitch:0.40, y:0.16, out:0.045,off:0.20},
-    {n:4, sc:0.33, pitch:0.24, y:0.19, out:0.035,off:0.40},
-    {n:3, sc:0.24, pitch:0.12, y:0.21, out:0.025,off:0.00}
+    {n:12, sc:1.05, pitch:1.16, y:0.00, out:0.11, off:0.00},
+    {n:11, sc:0.92, pitch:1.00, y:0.03, out:0.095,off:0.28},
+    {n:10, sc:0.80, pitch:0.85, y:0.06, out:0.08, off:0.00},
+    {n:8,  sc:0.66, pitch:0.68, y:0.10, out:0.065,off:0.39},
+    {n:7,  sc:0.54, pitch:0.52, y:0.13, out:0.05, off:0.00},
+    {n:6,  sc:0.42, pitch:0.38, y:0.16, out:0.04, off:0.50},
+    {n:5,  sc:0.32, pitch:0.26, y:0.18, out:0.03, off:0.20},
+    {n:4,  sc:0.23, pitch:0.16, y:0.20, out:0.022,off:0.00},
+    {n:3,  sc:0.16, pitch:0.09, y:0.21, out:0.015,off:0.30}
   ];
   rings.forEach(r=>{
     for (let i=0;i<r.n;i++){
@@ -335,8 +341,12 @@ function buildRose(){
       petals.push(m);
     }
   });
-  rose.position.y = 0.0;       // bloom centered in view
-  scene.add(rose);
+  rose.position.y = 0.0;
+  rose.scale.setScalar(0.92);
+  tilt = new THREE.Group();    // tilts the whole bloom to face the viewer
+  tilt.rotation.x = 0.62;
+  tilt.add(rose);
+  scene.add(tilt);
 }
 
 function initRose(){
@@ -352,13 +362,14 @@ function initRose(){
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-  camera.position.set(0, 0.72, 3.55);
-  camera.lookAt(0, -0.04, 0);
+  camera.position.set(0, 0.5, 4.25);
+  camera.lookAt(0, 0.0, 0);
 
-  scene.add(new THREE.AmbientLight(0xffe7d2, 0.6));
-  const key=new THREE.DirectionalLight(0xfff1e2, 1.35); key.position.set(1.5,2.8,2.2); scene.add(key);
-  const fill=new THREE.DirectionalLight(0xffd9c0, 0.45); fill.position.set(-2.2,0.4,1.2); scene.add(fill);
-  const rim=new THREE.DirectionalLight(0xff7080, 0.5); rim.position.set(0,1.2,-2.6); scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0xfff1e3, 0x180a07, 0.9)); // soft wrap fill smooths facets
+  scene.add(new THREE.AmbientLight(0xffe7d2, 0.22));
+  const key=new THREE.DirectionalLight(0xfff3e6, 0.95); key.position.set(1.4,2.6,2.6); scene.add(key);
+  const fill=new THREE.DirectionalLight(0xffd9c0, 0.38); fill.position.set(-2.2,0.6,1.6); scene.add(fill);
+  const rim=new THREE.DirectionalLight(0xff7382, 0.55); rim.position.set(0,1.4,-2.4); scene.add(rim);
 
   buildRose();
   clock = new THREE.Clock();
@@ -398,7 +409,7 @@ function tick(){
 }
 
 function startFall(){
-  rose.updateMatrixWorld(true);
+  scene.updateMatrixWorld(true);
   for (const m of petals){
     scene.attach(m);                                // bake current world transform
     const p=m.position;
