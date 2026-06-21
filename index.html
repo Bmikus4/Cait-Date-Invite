@@ -80,58 +80,38 @@
   }
 
   .bloom-scene{
-    width:min(74vw, 300px); height:min(74vw, 300px);
-    perspective:1000px; position:relative;
+    width:min(76vw, 300px); height:min(76vw, 300px);
+    position:relative;
     display:flex; align-items:center; justify-content:center;
     margin:6px 0 22px;
   }
   /* soft candle glow behind the bloom */
   .bloom-scene::before{
-    content:""; position:absolute; width:90%; height:90%; border-radius:50%;
-    background:radial-gradient(circle, rgba(207,77,104,.30) 0%, rgba(200,168,126,.12) 40%, transparent 70%);
+    content:""; position:absolute; width:92%; height:92%; border-radius:50%;
+    background:radial-gradient(circle, rgba(214,30,46,.28) 0%, rgba(200,168,126,.10) 44%, transparent 72%);
     filter:blur(8px); z-index:0;
   }
-  .flower{
-    position:relative; width:1px; height:1px;
-    transform-style:preserve-3d;
-    transform:rotateX(46deg) rotateZ(0deg);
-    animation:sway 13s ease-in-out infinite;
+  /* top-down layered SVG rose: deterministic paint order, zero z-fighting */
+  .rose{
+    position:relative; z-index:1; width:100%; height:100%; overflow:visible;
+    transform-origin:50% 50%;
+    animation:breathe 7s ease-in-out infinite;
     will-change:transform;
   }
-  @keyframes sway{
-    0%,100%{ transform:rotateX(46deg) rotateZ(-11deg); }
-    50%{ transform:rotateX(42deg) rotateZ(11deg); }
+  @keyframes breathe{
+    0%,100%{ transform:scale(1) rotate(-3deg); }
+    50%{ transform:scale(1.035) rotate(3deg); }
   }
+  .rp{ transform-box:fill-box; transform-origin:50% 100%; will-change:transform, opacity; }
 
-  .petal-pos{ position:absolute; left:0; top:0; transform-style:preserve-3d; }
-  .petal{
-    position:absolute; left:50%; bottom:0;
-    transform-origin:50% 100%;
-    border-radius:54% 54% 46% 46% / 80% 80% 28% 28%;
-    box-shadow:
-      inset 0 -10px 18px rgba(58,10,20,.55),
-      inset 0 8px 16px rgba(255,205,214,.28),
-      0 6px 16px -8px rgba(0,0,0,.55);
-    will-change:transform, opacity;
-    backface-visibility:hidden;
+  /* petals burst outward + fade on tap */
+  .rose.falling{ animation:none; }
+  .rose.falling #roseG{ filter:none; }
+  .rose.falling .rp{
+    animation:burst var(--fd,.7s) cubic-bezier(.3,.45,.3,1) var(--pd,0s) forwards;
   }
-  .bud{
-    position:absolute; left:50%; top:50%; width:26px; height:26px;
-    margin:-13px 0 0 -13px; border-radius:50%;
-    background:radial-gradient(circle at 40% 35%, #b8455a, #5e2029 75%);
-    box-shadow:0 2px 8px rgba(0,0,0,.5), inset 0 -3px 6px rgba(40,5,12,.6);
-    transform:translateZ(34px); will-change:transform, opacity;
-  }
-
-  /* petals fall + scatter on tap */
-  .flower.falling{ animation:none; }
-  .flower.falling .petal,
-  .flower.falling .bud{
-    animation:petalFall var(--fd,1.8s) cubic-bezier(.3,.5,.4,1) var(--pd,0s) forwards;
-  }
-  @keyframes petalFall{
-    0%{ opacity:1; }
-    100%{ transform:translate3d(var(--fx,0), 135vh, var(--fz,0)) rotateZ(var(--fr,420deg)) scale(.7); opacity:0; }
+  @keyframes burst{
+    to{ transform:translateY(-150px) rotate(var(--spin,80deg)); opacity:0; }
   }
 
   .tap-btn{
@@ -154,26 +134,6 @@
   .tap-sub{
     margin-top:14px; font-family:var(--serif); font-style:italic;
     font-size:15px; color:rgba(251,248,241,.55);
-  }
-
-  /* ============ COUNTDOWN ============ */
-  .countdown{
-    position:fixed; inset:0; z-index:30; display:none;
-    align-items:center; justify-content:center; pointer-events:none;
-  }
-  .countdown.on{ display:flex; }
-  .cd-num{
-    font-family:var(--serif); font-weight:500;
-    font-size:clamp(110px, 34vw, 200px); line-height:1;
-    color:var(--paper);
-    text-shadow:0 0 40px rgba(207,77,104,.5), 0 0 16px rgba(200,168,126,.5);
-  }
-  .cd-pop{ animation:cdPop .8s cubic-bezier(.2,1,.3,1); }
-  @keyframes cdPop{
-    0%{ opacity:0; transform:scale(1.6); }
-    25%{ opacity:1; transform:scale(1); }
-    80%{ opacity:1; transform:scale(1); }
-    100%{ opacity:0; transform:scale(.7); }
   }
 
   /* ============ THE LETTER ============ */
@@ -274,7 +234,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .mote{ display:none; }
-    .flower{ animation:none; }
+    .rose{ animation:none; }
     .tap-btn{ animation:none; }
     .letter, .reveal{ transition:none; animation:none; }
     .heart{ display:none; }
@@ -295,7 +255,6 @@
 </svg>
 
 <div class="dust" id="dust" aria-hidden="true"></div>
-<div class="countdown" id="countdown" aria-hidden="true"><span class="cd-num" id="cdnum"></span></div>
 
 <main class="stage" id="stage">
 
@@ -304,7 +263,18 @@
     <p class="eyebrow">An Invitation</p>
     <p class="for-name">for Cait</p>
     <div class="bloom-scene" aria-hidden="true">
-      <div class="flower" id="flower"></div>
+      <svg class="rose" id="rose" viewBox="0 0 200 200">
+        <defs>
+          <radialGradient id="sheen" cx="36%" cy="28%" r="78%">
+            <stop offset="0%" stop-color="#fff" stop-opacity=".34"/>
+            <stop offset="48%" stop-color="#fff" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="rsh" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#180206" flood-opacity="0.5"/>
+          </filter>
+        </defs>
+        <g id="roseG" filter="url(#rsh)"></g>
+      </svg>
     </div>
     <button class="tap-btn" id="tapbtn" aria-label="Tap to open the invitation">Tap to open</button>
     <p class="tap-sub">touch the bloom</p>
@@ -325,7 +295,7 @@
 
     <p class="note reveal" style="--d:.62s">
       There's a wall in the South Side with your name somewhere near the top of it.
-      Come find out how high we get. No experience needed. Just you.
+      No experience needed. Just you.
     </p>
 
     <div class="details">
@@ -389,66 +359,57 @@
     }
   })();
 
-  /* ----- build the 3D rose ----- */
+  /* ----- build the top-down SVG rose (rings, outer drawn first) ----- */
   (function(){
-    var flower = document.getElementById('flower');
-    // ring: count, petal width, height, tilt(deg back), z lift, fall delay, shade(0 outer .. 4 core)
+    var NS = 'http://www.w3.org/2000/svg';
+    var g = document.getElementById('roseG');
+    var petal = 'M0,0 C-13,-18 -13,-46 0,-60 C13,-46 13,-18 0,0Z';
+    // ring: count, scale, red fill (dark outer -> bright center), angle offset
     var rings = [
-      {n:9, w:72, h:116, tilt:56, z:0,  d:0.00, s:0},
-      {n:8, w:62, h:100, tilt:45, z:16, d:0.10, s:1, off:true},
-      {n:7, w:52, h:84,  tilt:35, z:30, d:0.20, s:2},
-      {n:6, w:40, h:66,  tilt:24, z:42, d:0.30, s:3, off:true},
-      {n:5, w:29, h:50,  tilt:13, z:52, d:0.40, s:4}
+      {n:8, s:1.42, f:'#6d0e16', o:0},
+      {n:8, s:1.12, f:'#8b121e', o:22.5},
+      {n:7, s:0.86, f:'#a81825', o:0},
+      {n:6, s:0.60, f:'#c41f2e', o:30},
+      {n:5, s:0.40, f:'#d82b3a', o:0},
+      {n:3, s:0.24, f:'#e6495a', o:18}
     ];
-    var shades = [
-      'linear-gradient(to top, #531c25 0%, #7e293c 40%, #a83b54 74%, #cf5f78 100%)',
-      'linear-gradient(to top, #5b1f29 0%, #8a2f42 40%, #b8455e 74%, #db708a 100%)',
-      'linear-gradient(to top, #642330 0%, #97374c 40%, #c34f6a 74%, #e681 98%)',
-      'linear-gradient(to top, #6e2937 0%, #a53e57 40%, #cf5d77 74%, #ef93ab 100%)',
-      'linear-gradient(to top, #7c3140 0%, #b54963 40%, #dd7088 74%, #f7aec0 100%)'
-    ];
-    rings.forEach(function(r){
+    rings.forEach(function(r, ri){
       for (var i=0;i<r.n;i++){
-        var ang = (360/r.n)*i + (r.off ? 180/r.n : 0);
-        var pos = document.createElement('div');
-        pos.className = 'petal-pos';
-        // fan around center (rotateZ), tilt the top backward (rotateX -tilt), lift toward viewer (translateZ)
-        pos.style.transform = 'rotateZ('+ang+'deg) rotateX(-'+r.tilt+'deg) translateZ('+r.z+'px)';
-
-        var p = document.createElement('div');
-        p.className = 'petal';
-        p.style.width = r.w+'px';
-        p.style.height = r.h+'px';
-        p.style.marginLeft = (-r.w/2)+'px';
-        p.style.background = shades[r.s];
-        // scatter vector for the fall: outward + spin + slight depth, plus jitter
-        var rad = ang*Math.PI/180;
-        var dist = 120 + Math.random()*120;
-        p.style.setProperty('--fx', (Math.sin(rad)*dist + (Math.random()*60-30)).toFixed(0)+'px');
-        p.style.setProperty('--fz', (Math.random()*120-30).toFixed(0)+'px');
-        p.style.setProperty('--fr', ((Math.random()*2>1?1:-1)*(300+Math.random()*420)).toFixed(0)+'deg');
-        p.style.setProperty('--fd', (1.5 + Math.random()*0.7).toFixed(2)+'s');
-        p.style.setProperty('--pd', (r.d + Math.random()*0.12).toFixed(2)+'s');
-        pos.appendChild(p);
-        flower.appendChild(pos);
+        var ang = (360/r.n)*i + r.o;
+        var grp = document.createElementNS(NS,'g');
+        grp.setAttribute('transform','translate(100,100) rotate('+ang+') scale('+r.s+')');
+        var p = document.createElementNS(NS,'path');
+        p.setAttribute('d', petal);
+        p.setAttribute('fill', r.f);
+        p.setAttribute('stroke','rgba(40,0,5,.42)');
+        p.setAttribute('stroke-width','0.8');
+        p.setAttribute('vector-effect','non-scaling-stroke');
+        p.setAttribute('class','rp');
+        // burst vector: spin + per-ring stagger (outer first)
+        p.style.setProperty('--spin', ((Math.random()>.5?1:-1)*(40+Math.random()*120)).toFixed(0)+'deg');
+        p.style.setProperty('--fd', (0.55 + Math.random()*0.35).toFixed(2)+'s');
+        p.style.setProperty('--pd', (ri*0.05 + Math.random()*0.07).toFixed(2)+'s');
+        grp.appendChild(p);
+        g.appendChild(grp);
       }
     });
-    var bud = document.createElement('div');
-    bud.className = 'bud';
-    bud.style.setProperty('--fx', (Math.random()*40-20).toFixed(0)+'px');
-    bud.style.setProperty('--fr', '200deg');
-    bud.style.setProperty('--fd', '1.5s');
-    bud.style.setProperty('--pd', '0.5s');
-    flower.appendChild(bud);
+    // tight dark center
+    var c = document.createElementNS(NS,'circle');
+    c.setAttribute('cx','100'); c.setAttribute('cy','100'); c.setAttribute('r','4.5');
+    c.setAttribute('fill','#5e0b12');
+    g.appendChild(c);
+    // light sheen on top (not a petal, fades with the rose)
+    var sh = document.createElementNS(NS,'circle');
+    sh.setAttribute('cx','100'); sh.setAttribute('cy','100'); sh.setAttribute('r','94');
+    sh.setAttribute('fill','url(#sheen)'); sh.setAttribute('pointer-events','none');
+    document.getElementById('rose').appendChild(sh);
   })();
 
-  /* ----- open: petals fall + 3-2-1 countdown + letter ----- */
+  /* ----- open: petals burst, invite pulls up immediately (no countdown) ----- */
   var stage = document.getElementById('stage');
   var bloom = document.getElementById('bloom');
-  var flower = document.getElementById('flower');
+  var rose = document.getElementById('rose');
   var letter = document.getElementById('letter');
-  var countdown = document.getElementById('countdown');
-  var cdnum = document.getElementById('cdnum');
   var opened = false;
 
   function showLetter(){
@@ -461,33 +422,20 @@
     else { requestAnimationFrame(function(){ requestAnimationFrame(function(){ letter.classList.add('show'); }); }); }
   }
 
-  function tick(n, cb){
-    cdnum.textContent = n;
-    cdnum.classList.remove('cd-pop'); void cdnum.offsetWidth; cdnum.classList.add('cd-pop');
-    setTimeout(cb, 800);
-  }
-
   function open(){
     if (opened) return; opened = true;
 
     if (reduce){
-      bloom.style.transition='opacity .35s ease'; bloom.style.opacity='0';
-      setTimeout(showLetter, 360);
+      bloom.style.transition='opacity .3s ease'; bloom.style.opacity='0';
+      setTimeout(showLetter, 320);
       return;
     }
 
-    flower.classList.add('falling');           // petals scatter
-    bloom.querySelector('.tap-btn').style.transition='opacity .3s ease';
+    rose.classList.add('falling');             // petals burst outward + fade
+    bloom.querySelector('.tap-btn').style.transition='opacity .25s ease';
     bloom.querySelector('.tap-btn').style.opacity='0';
     bloom.querySelector('.tap-sub').style.opacity='0';
-
-    countdown.classList.add('on');
-    setTimeout(function(){
-      tick('3', function(){ tick('2', function(){ tick('1', function(){
-        countdown.classList.remove('on');
-        showLetter();
-      }); }); });
-    }, 350);
+    setTimeout(showLetter, 620);               // invite pulls up right away
   }
 
   // tap anywhere on the bloom screen (or the button) opens it
