@@ -95,10 +95,17 @@
     position:relative; z-index:1; width:100%; height:100%; object-fit:contain; display:block;
     -webkit-mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
     mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
-    animation:hover 5.5s ease-in-out infinite;
-    will-change:transform; -webkit-user-drag:none; pointer-events:none;
+    /* glowing outline: drop-shadow follows the feathered rose silhouette */
+    filter:drop-shadow(0 0 10px rgba(255,150,110,.55)) drop-shadow(0 0 26px rgba(220,45,60,.42));
+    animation:hover 6.5s ease-in-out infinite, edgeGlow 4.5s ease-in-out infinite;
+    will-change:transform, filter; -webkit-user-drag:none; pointer-events:none;
   }
-  @keyframes hover{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-16px); } }
+  @keyframes edgeGlow{
+    0%,100%{ filter:drop-shadow(0 0 9px rgba(255,150,110,.45)) drop-shadow(0 0 22px rgba(220,45,60,.34)); }
+    50%{ filter:drop-shadow(0 0 15px rgba(255,170,120,.7)) drop-shadow(0 0 38px rgba(230,55,70,.5)); }
+  }
+  /* float up/down AND slowly breathe a little bigger */
+  @keyframes hover{ 0%,100%{ transform:translateY(0) scale(1); } 50%{ transform:translateY(-14px) scale(1.06); } }
   @media (prefers-reduced-motion: reduce){ .rose-img{ animation:none; } }
 
   /* gold glow that builds while you press and hold the rose */
