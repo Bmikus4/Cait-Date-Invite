@@ -28,7 +28,7 @@
   html,body{ height:100%; }
   body{
     font-family:var(--body); color:var(--ink);
-    background:radial-gradient(120% 90% at 50% 30%, #2c2016 0%, #1c1510 40%, var(--scene) 80%);
+    background:var(--scene);          /* flat dark; no backdrop halo glow at load */
     min-height:100dvh; overflow-x:hidden;
     -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   }
@@ -86,27 +86,16 @@
     position:relative; display:flex; align-items:center; justify-content:center; margin:2px 0 16px;
   }
   /* the rose illustration: feather its rectangular edges into the dark page, and hover up/down */
-  /* transparent PNG: gold glow traces the actual rose silhouette */
+  /* transparent PNG. No glow at rest; the gold trace is driven by the hold (JS). */
   .rose-img{
     position:relative; z-index:1; width:100%; height:100%; object-fit:contain; display:block;
-    animation:hover 6.5s ease-in-out infinite, traceGlow 4.5s ease-in-out infinite;
+    animation:hover 6.5s ease-in-out infinite;
     will-change:transform, filter; -webkit-user-drag:none; pointer-events:none;
-  }
-  @keyframes traceGlow{
-    0%,100%{ filter:drop-shadow(0 0 4px rgba(255,206,120,.65)) drop-shadow(0 0 10px rgba(255,190,95,.45)); }
-    50%{ filter:drop-shadow(0 0 7px rgba(255,216,140,.9)) drop-shadow(0 0 16px rgba(255,198,100,.62)); }
   }
   /* float up/down AND slowly breathe a little bigger */
   @keyframes hover{ 0%,100%{ transform:translateY(0) scale(1); } 50%{ transform:translateY(-14px) scale(1.06); } }
   @media (prefers-reduced-motion: reduce){ .rose-img{ animation:none; } }
 
-  /* gold glow that builds while you press and hold the rose */
-  .hold-glow{
-    position:absolute; left:48%; top:30%; transform:translate(-50%,-50%);
-    width:128%; height:52%; border-radius:50%; z-index:2; pointer-events:none; opacity:0;
-    background:radial-gradient(circle, rgba(255,214,140,.95) 0%, rgba(232,176,80,.55) 34%, rgba(200,150,60,0) 70%);
-    mix-blend-mode:screen; filter:blur(6px); will-change:opacity;
-  }
 
   .tap-btn{
     appearance:none; cursor:pointer;
@@ -210,8 +199,7 @@
     <p class="eyebrow">An Invitation</p>
     <p class="for-name">for Cait</p>
     <div class="bloom-scene" aria-hidden="true">
-      <img class="rose-img" src="rose.png" alt="A red rose" draggable="false" />
-      <span class="hold-glow" id="holdGlow"></span>
+      <img class="rose-img" id="roseImg" src="rose.png" alt="A red rose" draggable="false" />
     </div>
     <button class="tap-btn" id="tapbtn" aria-label="Press and hold to open the invitation">Hold to open</button>
     <p class="tap-sub">press &amp; hold the rose</p>
@@ -319,10 +307,16 @@
     setTimeout(function(){ bloom.style.display='none'; revealLetter(); }, reduce?320:600);
   }
 
-  /* ---------- hold-to-bloom: gold glow builds as you press and hold ---------- */
-  var glow=document.getElementById('holdGlow');
-  var HOLD_MS=1500, holding=false, holdStart=0, raf=0;
-  function setGlow(p){ glow.style.opacity=(p*0.95).toFixed(3); }
+  /* ---------- hold-to-bloom: NO glow at rest; gold trace appears & grows as you hold ---------- */
+  var roseImg=document.getElementById('roseImg');
+  var HOLD_MS=1500, holding=false, holdStart=0, raf=0, curP=0;
+  function traceFilter(p){
+    if (p<=0.002) return 'none';
+    var b1=(3+13*p).toFixed(1), a1=(0.22+0.66*p).toFixed(2);
+    var b2=(8+24*p).toFixed(1), a2=(0.14+0.5*p).toFixed(2);
+    return 'drop-shadow(0 0 '+b1+'px rgba(255,210,120,'+a1+')) drop-shadow(0 0 '+b2+'px rgba(255,196,100,'+a2+'))';
+  }
+  function setGlow(p){ curP=p; roseImg.style.filter=traceFilter(p); }
   function tick(){
     if (!holding) return;
     var p=Math.min(1,(performance.now()-holdStart)/HOLD_MS);
@@ -333,13 +327,13 @@
   function startHold(e){
     if (opened) return;
     e.preventDefault();
-    holding=true; holdStart=performance.now();
+    holding=true; holdStart=performance.now();   // grows from current (0 at rest)
     cancelAnimationFrame(raf); raf=requestAnimationFrame(tick);
   }
   function endHold(){
     if (!holding) return; holding=false; cancelAnimationFrame(raf);
-    var p0=parseFloat(glow.style.opacity)||0, t0=performance.now();   // ease glow back down
-    (function fade(){ var k=Math.min(1,(performance.now()-t0)/300); glow.style.opacity=(p0*(1-k)).toFixed(3); if (k<1) requestAnimationFrame(fade); })();
+    var p0=curP, t0=performance.now();            // ease the glow back to nothing
+    (function fade(){ var k=Math.min(1,(performance.now()-t0)/350); setGlow(p0*(1-k)); if (k<1) requestAnimationFrame(fade); })();
   }
   bloom.addEventListener('pointerdown', startHold);
   window.addEventListener('pointerup', endHold);
