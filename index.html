@@ -50,8 +50,8 @@
   /* film grain: fixed, non-interactive overlay above everything; jitters for a filmic shimmer */
   .grain{
     position:fixed; top:-50%; left:-50%; width:200%; height:200%;
-    z-index:70; pointer-events:none; opacity:.07; mix-blend-mode:overlay;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    z-index:70; pointer-events:none; opacity:.18;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-repeat:repeat;
     animation:grain .5s steps(3) infinite;
     will-change:transform;
@@ -78,20 +78,24 @@
   .for-name{ font-family:var(--script); font-size:46px; line-height:1; color:var(--paper); text-shadow:0 1px 22px rgba(200,168,126,.4); margin-bottom:14px; }
 
   .bloom-scene{
-    width:min(82vw, 340px); height:min(82vw, 340px);
-    position:relative; display:flex; align-items:center; justify-content:center; margin:2px 0 20px;
+    aspect-ratio:1024 / 1536; height:min(50dvh, 440px); width:auto;
+    position:relative; display:flex; align-items:center; justify-content:center; margin:2px 0 16px;
   }
   .bloom-scene::before{
-    content:""; position:absolute; width:88%; height:88%; border-radius:50%;
-    background:radial-gradient(circle, rgba(214,30,46,.26) 0%, rgba(200,168,126,.10) 46%, transparent 72%);
-    filter:blur(10px); z-index:0;
+    content:""; position:absolute; width:80%; height:62%; top:6%; left:10%; border-radius:50%;
+    background:radial-gradient(circle, rgba(214,30,46,.28) 0%, rgba(200,168,126,.10) 46%, transparent 72%);
+    filter:blur(14px); z-index:0;
   }
-  .rosehost{ position:absolute; inset:0; z-index:1; }
-  .rosehost canvas{ width:100% !important; height:100% !important; display:block; }
-
-  /* static SVG fallback (only shown if WebGL is unavailable) */
-  .rose-fallback{ position:absolute; inset:0; z-index:1; width:100%; height:100%; display:none; overflow:visible; }
-  .rose-fallback.shown{ display:block; }
+  /* the rose illustration: feather its rectangular edges into the dark page, and hover up/down */
+  .rose-img{
+    position:relative; z-index:1; width:100%; height:100%; object-fit:contain; display:block;
+    -webkit-mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
+    mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
+    animation:hover 5.5s ease-in-out infinite;
+    will-change:transform;
+  }
+  @keyframes hover{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-16px); } }
+  @media (prefers-reduced-motion: reduce){ .rose-img{ animation:none; } }
 
   .tap-btn{
     appearance:none; cursor:pointer;
@@ -195,11 +199,7 @@
     <p class="eyebrow">An Invitation</p>
     <p class="for-name">for Cait</p>
     <div class="bloom-scene" aria-hidden="true">
-      <div class="rosehost" id="rosehost"></div>
-      <!-- fallback only if WebGL is missing -->
-      <svg class="rose-fallback" id="roseFallback" viewBox="0 0 200 200">
-        <g id="fbG"></g>
-      </svg>
+      <img class="rose-img" src="rose.png" alt="A red rose" />
     </div>
     <button class="tap-btn" id="tapbtn" aria-label="Tap to open the invitation">Tap to open</button>
     <p class="tap-sub">touch the bloom</p>
@@ -264,327 +264,73 @@
 
 </main>
 
-<script type="module">
-import * as THREE from './three.module.min.js';
+<script>
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/* ---------- gold dust ---------- */
-(function(){
-  if (reduce) return;
-  const host = document.getElementById('dust');
-  const N = window.innerWidth < 520 ? 22 : 36;
-  for (let i=0;i<N;i++){
-    const m=document.createElement('span'); m.className='mote';
-    const size=(Math.random()*3+2).toFixed(1);
-    m.style.left=(Math.random()*100)+'vw'; m.style.width=size+'px'; m.style.height=size+'px';
-    m.style.setProperty('--dx',(Math.random()*60-30).toFixed(0)+'px');
-    m.style.animationDuration=(Math.random()*10+11).toFixed(1)+'s';
-    m.style.animationDelay=(-Math.random()*16).toFixed(1)+'s';
-    m.style.opacity=(Math.random()*.5+.3).toFixed(2);
-    host.appendChild(m);
-  }
-})();
-
-/* ---------- 3D rose (WebGL) ---------- */
-const host = document.getElementById('rosehost');
-let renderer, scene, camera, rose, tilt, clock;
-let petals = [], webglOK = false, falling = false, fallT = 0;
-
-function smoothstep(a,b,x){ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); }
-
-// Obovate rose petal: parametric grid + cup -> curl -> reflex -> ruffle, analytic normals.
-function makePetalGeometry(){
-  const NU=24, NV=20;          // across width (u in [-1,1]) x along length (v in [0,1])
-  const W=0.45, L=1.0, TMAX=0.9;
-  const P=[];                  // deformed positions grid
-  for (let iv=0; iv<=NV; iv++){
-    const v=iv/NV;
-    // true obovate: narrow base, broad ROUNDED top (top edge stays wide, shoulders round off)
-    let w = (v<0.6) ? Math.sin(Math.PI*0.5*(v/0.6))                  // 0 -> 1
-                    : 0.5 + 0.5*Math.cos(Math.PI*0.5*((v-0.6)/0.4)); // 1.0 -> 0.5 (broad rounded top)
-    w = Math.pow(Math.max(0,w), 0.7);
-    const theta=v*TMAX;
-    const ycurl=L*Math.sin(theta)/TMAX;             // longitudinal curl (bends backward)
-    const zcurl=-L*(1-Math.cos(theta))/TMAX;
-    P[iv]=[];
-    for (let iu=0; iu<=NU; iu++){
-      const u=-1+2*iu/NU;
-      const x=u*w*W;
-      const zcup=-0.27*(1-u*u)*Math.pow(v,1.4);      // cup: scoops across width
-      const zref=0.25*smoothstep(0.65,1.0,v)*(u*u);  // reflex: flips upper outer corners out
-      const zruf=0.04*Math.sin(5*Math.PI*u)*Math.pow(v,3)*smoothstep(0.7,1.0,Math.abs(u)); // ruffled rim
-      P[iv][iu]={ x:x, y:ycurl, z:zcup+zcurl+zref+zruf };
+  /* gold dust */
+  (function(){
+    if (reduce) return;
+    var host=document.getElementById('dust');
+    var N = window.innerWidth < 520 ? 22 : 36;
+    for (var i=0;i<N;i++){
+      var m=document.createElement('span'); m.className='mote';
+      var size=(Math.random()*3+2).toFixed(1);
+      m.style.left=(Math.random()*100)+'vw'; m.style.width=size+'px'; m.style.height=size+'px';
+      m.style.setProperty('--dx',(Math.random()*60-30).toFixed(0)+'px');
+      m.style.animationDuration=(Math.random()*10+11).toFixed(1)+'s';
+      m.style.animationDelay=(-Math.random()*16).toFixed(1)+'s';
+      m.style.opacity=(Math.random()*.5+.3).toFixed(2);
+      host.appendChild(m);
     }
-  }
-  const pos=[], nor=[], uv=[], aEdge=[], aBase=[], idx=[];
-  for (let iv=0; iv<=NV; iv++){
-    for (let iu=0; iu<=NU; iu++){
-      const u=-1+2*iu/NU, v=iv/NV, p=P[iv][iu];
-      // analytic normal from finite differences on the deformed grid (no faceting at the ruffle)
-      const ivp=Math.min(NV,iv+1), ivm=Math.max(0,iv-1), iup=Math.min(NU,iu+1), ium=Math.max(0,iu-1);
-      const ax=P[iv][iup].x-P[iv][ium].x, ay=P[iv][iup].y-P[iv][ium].y, az=P[iv][iup].z-P[iv][ium].z;
-      const bx=P[ivp][iu].x-P[ivm][iu].x, by=P[ivp][iu].y-P[ivm][iu].y, bz=P[ivp][iu].z-P[ivm][iu].z;
-      let nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx;
-      const ln=Math.hypot(nx,ny,nz)||1; nx/=ln; ny/=ln; nz/=ln;
-      if (nz<0){ nx=-nx; ny=-ny; nz=-nz; }
-      pos.push(p.x,p.y,p.z); nor.push(nx,ny,nz); uv.push(iu/NU, v);
-      aEdge.push(Math.max(0, Math.min(1-Math.abs(u), (1-v)/0.5)));  // 0 at rim, ~1 toward center
-      aBase.push(1-v);                                              // 1 at base/throat, 0 at tip
-    }
-  }
-  const cols=NU+1;
-  for (let iv=0; iv<NV; iv++){
-    for (let iu=0; iu<NU; iu++){
-      const a=iv*cols+iu, b=a+1, c=a+cols, d=c+1;
-      idx.push(a,c,b, b,c,d);
-    }
-  }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor,3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv,2));
-  g.setAttribute('aEdgeDist', new THREE.Float32BufferAttribute(aEdge,1));
-  g.setAttribute('aBaseFactor', new THREE.Float32BufferAttribute(aBase,1));
-  g.setIndex(idx);
-  return g;
-}
+  })();
 
-// MeshPhysicalMaterial + onBeforeCompile: throat darkening, edge translucency, two-tone back.
-function roseMaterial(){
-  const mat=new THREE.MeshPhysicalMaterial({
-    color:0x9c0d18, roughness:0.44, metalness:0.0,
-    sheen:0.9, sheenColor:new THREE.Color(0xd0545f), sheenRoughness:0.5,
-    clearcoat:0.22, clearcoatRoughness:0.5,
-    side:THREE.DoubleSide, transparent:false, opacity:1   // opaque while resting (no sort artifacts)
+  /* open: tap the rose -> fade -> the letter */
+  var stage=document.getElementById('stage');
+  var bloom=document.getElementById('bloom');
+  var letter=document.getElementById('letter');
+  var tapbtn=document.getElementById('tapbtn');
+  var tapsub=document.querySelector('.tap-sub');
+  var opened=false;
+
+  function revealLetter(){
+    stage.style.alignItems='flex-start';
+    letter.style.display='block';
+    letter.setAttribute('aria-hidden','false');
+    window.scrollTo({top:0, behavior:'auto'});
+    if (reduce){ letter.classList.add('show'); }
+    else { requestAnimationFrame(function(){ requestAnimationFrame(function(){ letter.classList.add('show'); }); }); }
+  }
+  function open(){
+    if (opened) return; opened=true;
+    tapbtn.style.transition='opacity .25s ease'; tapbtn.style.opacity='0'; tapsub.style.opacity='0';
+    bloom.style.transition='opacity .6s ease'; bloom.style.opacity='0';
+    setTimeout(function(){ bloom.style.display='none'; revealLetter(); }, reduce?320:600);
+  }
+  tapbtn.addEventListener('click', function(e){ e.stopPropagation(); open(); });
+  stage.addEventListener('click', function(){ if (!opened && bloom.style.display!=='none') open(); });
+
+  /* yes -> hearts + confirmation */
+  document.getElementById('yes').addEventListener('click', function(e){
+    e.stopPropagation();
+    document.getElementById('invite-block').style.display='none';
+    document.getElementById('confirm').classList.add('show');
+    if (reduce) return;
+    var glyphs=['♥','❤'];
+    for (var i=0;i<26;i++){
+      (function(i){
+        setTimeout(function(){
+          var h=document.createElement('span'); h.className='heart'; h.textContent=glyphs[i%glyphs.length];
+          h.style.left=(Math.random()*88+6)+'vw'; h.style.bottom=(Math.random()*16+6)+'dvh';
+          h.style.fontSize=(Math.random()*16+14).toFixed(0)+'px';
+          h.style.color = i%3===0 ? '#c8a87e' : '#7a2e36';
+          h.style.setProperty('--r',(Math.random()*40-20).toFixed(0)+'deg');
+          h.style.animationDuration=(Math.random()*1.1+2).toFixed(1)+'s';
+          document.body.appendChild(h);
+          setTimeout(function(){ h.remove(); }, 2600);
+        }, i*55);
+      })(i);
+    }
   });
-  mat.envMapIntensity=1.0;
-  mat.onBeforeCompile=(sh)=>{
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aEdgeDist;\nattribute float aBaseFactor;\nvarying float vEdge;\nvarying float vBase;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdge=aEdgeDist;\nvBase=aBaseFactor;');
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vEdge;\nvarying float vBase;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\n' +
-        'diffuseColor.rgb *= mix(1.0, 0.46, vBase*vBase);\n' +                  // darker throat
-        'diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.72,0.09,0.13), (1.0-vEdge)*0.32);\n' + // lit red rim
-        'if(!gl_FrontFacing){ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62,0.20,0.24), 0.4); }\n'); // slightly paler back
-  };
-  return mat;
-}
-
-function buildRose(){
-  rose = new THREE.Group();
-  const geo = makePetalGeometry();
-  // golden-angle phyllotaxis: furled bud center -> cupped half-open outer (matches the reference)
-  const N = 40;
-  const GA = Math.PI * (3 - Math.sqrt(5));   // 137.5deg
-  for (let i=0;i<N;i++){
-    const f = i/(N-1);                        // 0 inner .. 1 outer
-    const ef = Math.pow(f, 0.72);
-    const pivot = new THREE.Group();
-    pivot.rotation.y = i*GA;
-    const arm = new THREE.Group();
-    arm.position.set(0, 0.42*(1-ef), 0.006 + 0.125*ef);
-    const yawG = new THREE.Group();           // per-petal twist -> spiral swirl
-    yawG.rotation.y = 0.92*(1-f);
-    const m = new THREE.Mesh(geo, roseMaterial());
-    m.scale.setScalar(0.32 + 1.12*ef);        // small furled center -> large cupping outer
-    // inner petals lean IN over the core; outer cup upward (goblet), not splayed flat
-    m.rotation.x = -0.28 + 1.06*Math.pow(f, 1.2);
-    yawG.add(m); arm.add(yawG); pivot.add(arm); rose.add(pivot);
-    petals.push(m);
-  }
-  // tight furled bud core
-  const bud = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.22, 12), roseMaterial());
-  bud.position.y = 0.26; rose.add(bud); petals.push(bud);
-  rose.position.y = 0.0;
-  rose.scale.setScalar(0.95);
-  tilt = new THREE.Group();    // tilts the whole bloom to face the viewer
-  tilt.rotation.x = 0.62;
-  tilt.add(rose);
-  scene.add(tilt);
-}
-
-// synthetic environment: a warm-top/dark-bottom gradient prefiltered through PMREM -> soft IBL
-function makeEnvMap(){
-  const pmrem=new THREE.PMREMGenerator(renderer);
-  const envScene=new THREE.Scene();
-  const c=document.createElement('canvas'); c.width=8; c.height=128;
-  const ctx=c.getContext('2d');
-  const g=ctx.createLinearGradient(0,0,0,128);
-  g.addColorStop(0.00,'#fff4e6');   // warm soft key overhead
-  g.addColorStop(0.45,'#9b8a7c');   // neutral mid
-  g.addColorStop(1.00,'#1c0f12');   // dark warm floor
-  ctx.fillStyle=g; ctx.fillRect(0,0,8,128);
-  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace;
-  const sph=new THREE.Mesh(new THREE.SphereGeometry(12,24,16), new THREE.MeshBasicMaterial({map:tex, side:THREE.BackSide}));
-  envScene.add(sph);
-  const rt=pmrem.fromScene(envScene, 0.5);
-  tex.dispose(); sph.geometry.dispose(); sph.material.dispose(); pmrem.dispose();
-  return rt.texture;
-}
-
-function initRose(){
-  const test=document.createElement('canvas');
-  const gl=test.getContext('webgl')||test.getContext('experimental-webgl');
-  if(!gl) return false;
-
-  const size = host.clientWidth || 300;
-  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
-  renderer.setSize(size, size);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;   // keeps reds from clipping to orange
-  renderer.toneMappingExposure = 1.0;
-  host.appendChild(renderer.domElement);
-
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-  camera.position.set(0, 0.5, 4.25);
-  camera.lookAt(0, 0.0, 0);
-
-  scene.environment = makeEnvMap();                     // synthetic PMREM IBL (no HemisphereLight)
-  const key=new THREE.DirectionalLight(0xfff2e6, 1.7); key.position.set(1.3,2.8,2.4); scene.add(key);
-  const rim=new THREE.DirectionalLight(0xe85565, 0.9);  rim.position.set(-0.6,1.2,-2.6); scene.add(rim);
-
-  buildRose();
-  clock = new THREE.Clock();
-
-  if (reduce){ renderer.render(scene,camera); }
-  else { renderer.setAnimationLoop(tick); }
-
-  window.addEventListener('resize', onResize);
-  return true;
-}
-
-function onResize(){
-  if(!renderer) return;
-  const size = host.clientWidth || 300;
-  renderer.setSize(size, size);
-}
-
-function tick(){
-  const dt=Math.min(clock.getDelta(), 0.05);
-  const t=clock.elapsedTime;
-  if (rose && !falling){
-    rose.rotation.y = Math.sin(t*0.5)*0.5;          // gentle turn
-    rose.rotation.z = Math.sin(t*0.37)*0.05;        // subtle nod
-  }
-  if (falling){
-    fallT += dt;
-    const wind = new THREE.Vector3(Math.sin(t*1.4)*0.6 + 0.35, 0, Math.cos(t*1.1)*0.4);
-    for (const m of petals){
-      const v=m.userData.vel;
-      v.y -= 1.7*dt;                                 // gravity (petals are light)
-      v.addScaledVector(wind, dt*0.9);               // wind push
-      v.multiplyScalar(1 - 1.9*dt);                  // air drag -> flutter/float, not a rock drop
-      m.position.addScaledVector(v, dt);
-      m.rotation.x += m.userData.av.x*dt;
-      m.rotation.y += m.userData.av.y*dt;
-      m.rotation.z += m.userData.av.z*dt;
-      m.userData.av.multiplyScalar(1 - 0.8*dt);      // spin damping
-      m.material.opacity = Math.max(0, 1 - fallT/1.3);
-    }
-  }
-  renderer.render(scene,camera);
-}
-
-function startFall(){
-  scene.updateMatrixWorld(true);
-  for (const m of petals){
-    scene.attach(m);                                // bake current world transform
-    m.material.transparent=true; m.material.depthWrite=false; // enable fade (no recompile)
-    const p=m.position;
-    m.userData.vel=new THREE.Vector3(
-      p.x*1.2 + (Math.random()-0.5)*0.35,
-      0.25 + Math.random()*0.5,
-      p.z*1.2 + (Math.random()-0.5)*0.35
-    );
-    m.userData.av=new THREE.Vector3(
-      (Math.random()-0.5)*4.5,(Math.random()-0.5)*4.5,(Math.random()-0.5)*4.5
-    );
-  }
-  falling=true; fallT=0;
-}
-
-/* build the static SVG fallback only if needed */
-function buildFallback(){
-  const NS='http://www.w3.org/2000/svg';
-  const g=document.getElementById('fbG');
-  const petal='M0,0 C-13,-18 -13,-46 0,-60 C13,-46 13,-18 0,0Z';
-  const rings=[{n:8,s:1.42,f:'#6d0e16',o:0},{n:8,s:1.12,f:'#8b121e',o:22.5},{n:7,s:0.86,f:'#a81825',o:0},{n:6,s:0.6,f:'#c41f2e',o:30},{n:5,s:0.4,f:'#d82b3a',o:0}];
-  rings.forEach(r=>{ for(let i=0;i<r.n;i++){ const a=(360/r.n)*i+r.o;
-    const grp=document.createElementNS(NS,'g'); grp.setAttribute('transform','translate(100,100) rotate('+a+') scale('+r.s+')');
-    const p=document.createElementNS(NS,'path'); p.setAttribute('d',petal); p.setAttribute('fill',r.f);
-    p.setAttribute('stroke','rgba(40,0,5,.42)'); p.setAttribute('stroke-width','0.8'); p.setAttribute('vector-effect','non-scaling-stroke');
-    grp.appendChild(p); g.appendChild(grp);
-  }});
-  document.getElementById('roseFallback').classList.add('shown');
-}
-
-try { webglOK = initRose(); } catch(e){ webglOK = false; }
-if (!webglOK) buildFallback();
-
-/* ---------- open ---------- */
-const stage=document.getElementById('stage');
-const bloom=document.getElementById('bloom');
-const letter=document.getElementById('letter');
-const tapbtn=document.getElementById('tapbtn');
-const tapsub=document.querySelector('.tap-sub');
-const canFancy = webglOK && !reduce;
-let opened=false;
-
-function revealLetter(){
-  stage.style.alignItems='flex-start';
-  letter.style.display='block';
-  letter.setAttribute('aria-hidden','false');
-  window.scrollTo({top:0, behavior:'auto'});
-  if (reduce){ letter.classList.add('show'); }
-  else { requestAnimationFrame(()=>requestAnimationFrame(()=>letter.classList.add('show'))); }
-}
-
-function open(){
-  if (opened) return; opened=true;
-  tapbtn.style.transition='opacity .25s ease'; tapbtn.style.opacity='0'; tapsub.style.opacity='0';
-
-  if (canFancy){
-    startFall();                                    // petals tumble away in 3D
-    bloom.style.position='fixed'; bloom.style.inset='0'; bloom.style.zIndex='20';
-    revealLetter();                                 // invite pulls up immediately, underneath
-    setTimeout(()=>{ bloom.style.transition='opacity .6s ease'; bloom.style.opacity='0'; }, 260);
-    setTimeout(()=>{ bloom.style.display='none'; if(renderer) renderer.setAnimationLoop(null); }, 1250);
-  } else {
-    bloom.style.transition='opacity .3s ease'; bloom.style.opacity='0';
-    setTimeout(()=>{ bloom.style.display='none'; revealLetter(); }, 320);
-  }
-}
-
-tapbtn.addEventListener('click', e=>{ e.stopPropagation(); open(); });
-stage.addEventListener('click', ()=>{ if (!opened && bloom.style.display!=='none') open(); });
-
-/* ---------- yes -> hearts + confirmation ---------- */
-document.getElementById('yes').addEventListener('click', e=>{
-  e.stopPropagation();
-  document.getElementById('invite-block').style.display='none';
-  document.getElementById('confirm').classList.add('show');
-  if (reduce) return;
-  const glyphs=['♥','❤'];
-  for (let i=0;i<26;i++){
-    (function(i){
-      setTimeout(function(){
-        const h=document.createElement('span'); h.className='heart'; h.textContent=glyphs[i%glyphs.length];
-        h.style.left=(Math.random()*88+6)+'vw'; h.style.bottom=(Math.random()*16+6)+'dvh';
-        h.style.fontSize=(Math.random()*16+14).toFixed(0)+'px';
-        h.style.color = i%3===0 ? '#c8a87e' : '#7a2e36';
-        h.style.setProperty('--r',(Math.random()*40-20).toFixed(0)+'deg');
-        h.style.animationDuration=(Math.random()*1.1+2).toFixed(1)+'s';
-        document.body.appendChild(h);
-        setTimeout(()=>h.remove(), 2600);
-      }, i*55);
-    })(i);
-  }
-});
 </script>
 </body>
 </html>
