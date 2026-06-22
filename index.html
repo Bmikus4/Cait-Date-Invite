@@ -85,24 +85,22 @@
     aspect-ratio:1024 / 1536; height:min(50dvh, 440px); width:auto;
     position:relative; display:flex; align-items:center; justify-content:center; margin:2px 0 16px;
   }
+  /* gold outline glow, strictly BEHIND the rose (z0 < rose z1), ~20% tighter spread */
   .bloom-scene::before{
-    content:""; position:absolute; width:80%; height:62%; top:6%; left:10%; border-radius:50%;
-    background:radial-gradient(circle, rgba(214,30,46,.28) 0%, rgba(200,168,126,.10) 46%, transparent 72%);
-    filter:blur(14px); z-index:0;
+    content:""; position:absolute; left:48%; top:31%; transform:translate(-50%,-50%);
+    width:60%; height:39%; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,206,120,.92) 0%, rgba(232,180,90,.5) 40%, rgba(210,165,75,0) 72%);
+    filter:blur(13px); z-index:0;
+    animation:glowPulse 4.5s ease-in-out infinite;
   }
+  @keyframes glowPulse{ 0%,100%{ opacity:.6; } 50%{ opacity:.95; } }
   /* the rose illustration: feather its rectangular edges into the dark page, and hover up/down */
   .rose-img{
     position:relative; z-index:1; width:100%; height:100%; object-fit:contain; display:block;
     -webkit-mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
     mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
-    /* glowing outline: drop-shadow follows the feathered rose silhouette */
-    filter:drop-shadow(0 0 10px rgba(255,150,110,.55)) drop-shadow(0 0 26px rgba(220,45,60,.42));
-    animation:hover 6.5s ease-in-out infinite, edgeGlow 4.5s ease-in-out infinite;
-    will-change:transform, filter; -webkit-user-drag:none; pointer-events:none;
-  }
-  @keyframes edgeGlow{
-    0%,100%{ filter:drop-shadow(0 0 9px rgba(255,150,110,.45)) drop-shadow(0 0 22px rgba(220,45,60,.34)); }
-    50%{ filter:drop-shadow(0 0 15px rgba(255,170,120,.7)) drop-shadow(0 0 38px rgba(230,55,70,.5)); }
+    animation:hover 6.5s ease-in-out infinite;
+    will-change:transform; -webkit-user-drag:none; pointer-events:none;
   }
   /* float up/down AND slowly breathe a little bigger */
   @keyframes hover{ 0%,100%{ transform:translateY(0) scale(1); } 50%{ transform:translateY(-14px) scale(1.06); } }
