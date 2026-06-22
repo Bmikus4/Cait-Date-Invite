@@ -73,7 +73,11 @@
   }
 
   /* ============ BLOOM SCREEN ============ */
-  .bloom-screen{ width:100%; max-width:420px; display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .bloom-screen{
+    width:100%; max-width:420px; display:flex; flex-direction:column; align-items:center; text-align:center;
+    touch-action:none;                 /* no scroll/zoom while holding (mobile) */
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; /* no long-press image-save/select */
+  }
   .eyebrow{ font-family:var(--serif); font-size:13px; letter-spacing:.34em; text-transform:uppercase; color:var(--gold); opacity:.92; margin-bottom:8px; }
   .for-name{ font-family:var(--script); font-size:46px; line-height:1; color:var(--paper); text-shadow:0 1px 22px rgba(200,168,126,.4); margin-bottom:14px; }
 
@@ -92,10 +96,18 @@
     -webkit-mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
     mask-image:radial-gradient(circle at 50% 42%, #000 58%, transparent 90%);
     animation:hover 5.5s ease-in-out infinite;
-    will-change:transform;
+    will-change:transform; -webkit-user-drag:none; pointer-events:none;
   }
   @keyframes hover{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-16px); } }
   @media (prefers-reduced-motion: reduce){ .rose-img{ animation:none; } }
+
+  /* gold glow that builds while you press and hold the rose */
+  .hold-glow{
+    position:absolute; left:48%; top:30%; transform:translate(-50%,-50%);
+    width:128%; height:52%; border-radius:50%; z-index:2; pointer-events:none; opacity:0;
+    background:radial-gradient(circle, rgba(255,214,140,.95) 0%, rgba(232,176,80,.55) 34%, rgba(200,150,60,0) 70%);
+    mix-blend-mode:screen; filter:blur(6px); will-change:opacity;
+  }
 
   .tap-btn{
     appearance:none; cursor:pointer;
@@ -199,10 +211,11 @@
     <p class="eyebrow">An Invitation</p>
     <p class="for-name">for Cait</p>
     <div class="bloom-scene" aria-hidden="true">
-      <img class="rose-img" src="rose.png" alt="A red rose" />
+      <img class="rose-img" src="rose.png" alt="A red rose" draggable="false" />
+      <span class="hold-glow" id="holdGlow"></span>
     </div>
-    <button class="tap-btn" id="tapbtn" aria-label="Tap to open the invitation">Tap to open</button>
-    <p class="tap-sub">touch the bloom</p>
+    <button class="tap-btn" id="tapbtn" aria-label="Press and hold to open the invitation">Hold to open</button>
+    <p class="tap-sub">press &amp; hold the rose</p>
   </div>
 
   <!-- LETTER -->
@@ -306,8 +319,33 @@
     bloom.style.transition='opacity .6s ease'; bloom.style.opacity='0';
     setTimeout(function(){ bloom.style.display='none'; revealLetter(); }, reduce?320:600);
   }
-  tapbtn.addEventListener('click', function(e){ e.stopPropagation(); open(); });
-  stage.addEventListener('click', function(){ if (!opened && bloom.style.display!=='none') open(); });
+
+  /* ---------- hold-to-bloom: gold glow builds as you press and hold ---------- */
+  var glow=document.getElementById('holdGlow');
+  var HOLD_MS=1500, holding=false, holdStart=0, raf=0;
+  function setGlow(p){ glow.style.opacity=(p*0.95).toFixed(3); }
+  function tick(){
+    if (!holding) return;
+    var p=Math.min(1,(performance.now()-holdStart)/HOLD_MS);
+    setGlow(p);
+    if (p>=1){ holding=false; open(); return; }
+    raf=requestAnimationFrame(tick);
+  }
+  function startHold(e){
+    if (opened) return;
+    e.preventDefault();
+    holding=true; holdStart=performance.now();
+    cancelAnimationFrame(raf); raf=requestAnimationFrame(tick);
+  }
+  function endHold(){
+    if (!holding) return; holding=false; cancelAnimationFrame(raf);
+    var p0=parseFloat(glow.style.opacity)||0, t0=performance.now();   // ease glow back down
+    (function fade(){ var k=Math.min(1,(performance.now()-t0)/300); glow.style.opacity=(p0*(1-k)).toFixed(3); if (k<1) requestAnimationFrame(fade); })();
+  }
+  bloom.addEventListener('pointerdown', startHold);
+  window.addEventListener('pointerup', endHold);
+  window.addEventListener('pointercancel', endHold);
+  bloom.addEventListener('contextmenu', function(e){ e.preventDefault(); });  // kill long-press menu
 
   /* yes -> hearts + confirmation */
   document.getElementById('yes').addEventListener('click', function(e){
